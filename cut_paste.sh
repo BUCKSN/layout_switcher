@@ -16,7 +16,11 @@ sleep $SLEEP_TIME
 
 # --- 2. БЭКАП ТЕКУЩЕГО БУФЕРА ---
 # Сохраняем то, что было в буфере до запуска скрипта
-CLIP_BACKUP=$(gdbus call --session --dest org.kde.klipper --object-path /klipper --method org.kde.klipper.klipper.getClipboardContents | sed -E "$CLEAN_SED")
+if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
+    CLIP_BACKUP=$(wl-paste)
+elif [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]]; then
+    CLIP_BACKUP=$(gdbus call --session --dest org.kde.klipper --object-path /klipper --method org.kde.klipper.klipper.getClipboardContents | sed -E "$CLEAN_SED")
+fi
 
 # --- 3. ЗАХВАТ ТЕКСТА (Вырезание) ---
 # Нажимаем Ctrl+X
@@ -24,7 +28,11 @@ ydotool key 29:1 45:1 45:0 29:0
 sleep $SLEEP_TIME
 
 # Получаем вырезанный текст из Klipper
-NEW_CLIP=$(gdbus call --session --dest org.kde.klipper --object-path /klipper --method org.kde.klipper.klipper.getClipboardContents | sed -E "$CLEAN_SED")
+if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
+    CLIP_BACKUP=$(wl-paste)
+elif [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]]; then
+    NEW_CLIP=$(gdbus call --session --dest org.kde.klipper --object-path /klipper --method org.kde.klipper.klipper.getClipboardContents | sed -E "$CLEAN_SED")
+fi
 
 # --- 4. ОБРАБОТКА И ВСТАВКА ---
 # --- ЗАЩИТА СПЕЦСИМВОЛОВ \t \r \n (как пар символов) ОТ КОНВЕРТАЦИИ ---
@@ -156,9 +164,18 @@ converted_end=$(echo "$converted_clean" | sed 's/\x01/\\t/g; s/\x02/\\r/g; s/\x0
 gdbus call --session --dest org.kde.klipper --object-path /klipper \
 --method org.kde.klipper.klipper.setClipboardContents "$converted_end" > /dev/null
 
-if [[ "$target_layout" == "0" || "$target_layout" == "1" ]]; then
-    # echo "Раскаладка переключена! на $target_layout"
-    gdbus call --session --dest org.kde.keyboard --object-path /Layouts --method org.kde.KeyboardLayouts.setLayout "$target_layout" > /dev/null
+if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
+    # Логика для Fedora GNOME
+    if [[ "$target_layout" == "0" ]]; then
+        gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('xkb', 'ru')]"
+    else
+        gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'ru'), ('xkb', 'us')]"
+    fi
+elif [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]]; then
+    if [[ "$target_layout" == "0" || "$target_layout" == "1" ]]; then
+        # echo "Раскаладка переключена! на $target_layout"
+        gdbus call --session --dest org.kde.keyboard --object-path /Layouts --method org.kde.KeyboardLayouts.setLayout "$target_layout" > /dev/null
+    fi
 fi
 
 sleep $SLEEP_TIME
@@ -174,7 +191,11 @@ ydotool key 29:0 47:0
 # Возвращаем в буфер то, что там было до вырезания, через полсекунды
 (
     sleep $SLEEP_TIME
-    gdbus call --session --dest org.kde.klipper --object-path /klipper --method org.kde.klipper.klipper.setClipboardContents "$CLIP_BACKUP" > /dev/null
+    if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
+        echo "$CLIP_BACKUP" | wl-copy
+    elif [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]]; then
+        gdbus call --session --dest org.kde.klipper --object-path /klipper --method org.kde.klipper.klipper.setClipboardContents "$CLIP_BACKUP" > /dev/null
+    fi
 ) &
 
 # Финальный сброс всех возможных кнопок
