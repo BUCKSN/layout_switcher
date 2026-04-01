@@ -1,17 +1,46 @@
 #!/bin/bash
-# Проверка наличия ydotool
+# Определение менеджера пакетов
+PKG_MANAGER=$(command -v nala || command -v apt || command -v dnf || command -v pacman)
+
+# 1. Установка и проверка ydotool (нужен везде)
 if ! command -v ydotool &> /dev/null; then
-    notify-send "Ошибка" "ydotool не установлен. Пожалуйста, установите его для работы скрипта."
-    exit 1
+    echo "Установка ydotool..."
+    sudo $PKG_MANAGER install -y ydotool
+    
+    # Включаем сервис ydotool (необходим для работы в Wayland/Ubuntu)
+    systemctl --user enable --now ydotool.service 2>/dev/null || echo "Внимание: не забудьте запустить ydotool сервис"
+    
+    notify-send "Установка" "ydotool установлен. Если он не работает, перезагрузитесь."
 fi
 
-# Проверка wl-clipboard только для GNOME
+# 2. Специфичные проверки для GNOME
 if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
+    # Проверка wl-clipboard
     if ! command -v wl-copy &> /dev/null; then
-        notify-send "Ошибка" "Вы используете GNOME, но wl-clipboard не установлен."
+        sudo $PKG_MANAGER install -y wl-clipboard
+    fi
+
+    ID="shyriiwook@madhead.me"
+
+    # Если расширение не установлено
+    if ! gnome-extensions list | grep -q "$ID"; then
+        echo "Настройка инструментов и расширения для GNOME..."
+        
+        # Установка pipx, если его нет
+        command -v pipx &> /dev/null || sudo $PKG_MANAGER install -y pipx
+        
+        # Установка расширения
+        pipx run gnome-extensions-cli install "$ID" --yes
+        
+        notify-send "GNOME" "Расширение установлено. ПЕРЕЗАЙДИТЕ В СИСТЕМУ (Log Out)!"
         exit 1
     fi
+    
+    # Активируем расширение
+    gnome-extensions enable "$ID" 2>/dev/null
 fi
+
+
 # --- НАСТРОЙКИ ---
 CONVERTER_PATH="$HOME/Applications/convert.sh"
 SLEEP_TIME=0.01
@@ -175,10 +204,11 @@ gdbus call --session --dest org.kde.klipper --object-path /klipper \
 if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
     # Логика для Fedora GNOME
     if [[ "$target_layout" == "0" ]]; then
-        gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('xkb', 'ru')]"
-    else
-        gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'ru'), ('xkb', 'us')]"
+        layout="us"
+    elif [[ "$target_layout" == "1" ]]; then
+        layout="ru"
     fi
+    gdbus call --session --dest org.gnome.Shell --object-path /me/madhead/Shyriiwook --method me.madhead.Shyriiwook.activate "$layout"
 elif [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]]; then
     if [[ "$target_layout" == "0" || "$target_layout" == "1" ]]; then
         # echo "Раскаладка переключена! на $target_layout"
