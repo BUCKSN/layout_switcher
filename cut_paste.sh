@@ -4,6 +4,14 @@ if ! command -v ydotool &> /dev/null; then
     notify-send "Ошибка" "ydotool не установлен. Пожалуйста, установите его для работы скрипта."
     exit 1
 fi
+
+# Проверка wl-clipboard только для GNOME
+if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
+    if ! command -v wl-copy &> /dev/null; then
+        notify-send "Ошибка" "Вы используете GNOME, но wl-clipboard не установлен."
+        exit 1
+    fi
+fi
 # --- НАСТРОЙКИ ---
 CONVERTER_PATH="$HOME/Applications/convert.sh"
 SLEEP_TIME=0.01
