@@ -1,45 +1,50 @@
 #!/bin/bash
-# Определение менеджера пакетов
-PKG_MANAGER=$(command -v nala || command -v apt || command -v dnf || command -v pacman)
+#!/bin/bash
 
-# 1. Установка и проверка ydotool (нужен везде)
-if ! command -v ydotool &> /dev/null; then
-    echo "Установка ydotool..."
-    sudo $PKG_MANAGER install -y ydotool
-    
-    # Включаем сервис ydotool (необходим для работы в Wayland/Ubuntu)
-    systemctl --user enable --now ydotool.service 2>/dev/null || echo "Внимание: не забудьте запустить ydotool сервис"
-    
-    notify-send "Установка" "ydotool установлен. Если он не работает, перезагрузитесь."
+# Определение менеджера пакетов для вывода инструкций
+PKG=$(command -v nala || command -v apt || command -v dnf || command -v pacman || echo "apt/dnf/pacman")
+
+# 1. Проверка ydotool и ydotoold
+if ! command -v ydotool &> /dev/null || ! command -v ydotoold &> /dev/null; then
+    echo "--- ОШИБКА: ydotool или ydotoold не установлены ---"
+    echo "Для установки выполните:"
+    echo "  sudo $PKG install ydotool ydotoold"
+    echo "После установки настройте сервис (см. ранее созданный скрипт)."
+fi
+
+# Проверка, запущен ли пользовательский сервис ydotool
+if ! systemctl --user is-active --quiet ydotool.service; then
+    echo "--- ПРЕДУПРЕЖДЕНИЕ: Сервис ydotool не запущен ---"
+    echo "Выполните: systemctl --user enable --now ydotool.service"
+    echo "или"
+    echo "Выполните: systemctl --user enable --now ydotoold.service"
 fi
 
 # 2. Специфичные проверки для GNOME
 if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
+    
     # Проверка wl-clipboard
     if ! command -v wl-copy &> /dev/null; then
-        sudo $PKG_MANAGER install -y wl-clipboard
+        echo "--- ОШИБКА: wl-clipboard не установлен ---"
+        echo "Для работы в GNOME выполните: sudo $PKG install wl-clipboard"
+        exit 1
     fi
 
+    # Проверка расширения Shyriiwook (для переключения раскладки)
     ID="shyriiwook@madhead.me"
-
-    # Если расширение не установлено
     if ! gnome-extensions list | grep -q "$ID"; then
-        echo "Настройка инструментов и расширения для GNOME..."
-        
-        # Установка pipx, если его нет
-        command -v pipx &> /dev/null || sudo $PKG_MANAGER install -y pipx
-        
-        # Установка расширения
-        pipx run gnome-extensions-cli install "$ID" --yes
-        
-        notify-send "GNOME" "Расширение установлено. ПЕРЕЗАЙДИТЕ В СИСТЕМУ (Log Out)!"
+        echo "--- ОШИБКА: Расширение Shyriiwook не найдено ---"
+        echo "Оно нужно для переключения раскладки в GNOME 41+."
+        echo "Для установки (нужен pipx):"
+        echo "  1. sudo $PKG install pipx"
+        echo "  2. pipx run gnome-extensions-cli install $ID --yes"
+        echo "  3. ПЕРЕЗАЙДИТЕ В СИСТЕМУ (Log Out)"
         exit 1
     fi
     
-    # Активируем расширение
+    # Попытка активации, если установлено, но выключено
     gnome-extensions enable "$ID" 2>/dev/null
 fi
-
 
 # --- НАСТРОЙКИ ---
 CONVERTER_PATH="$HOME/Applications/convert.sh"
