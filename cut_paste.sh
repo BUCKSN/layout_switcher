@@ -1,5 +1,4 @@
 #!/bin/bash
-#!/bin/bash
 
 # Определение менеджера пакетов для вывода инструкций
 PKG=$(command -v nala || command -v apt || command -v dnf || command -v pacman || echo "apt/dnf/pacman")
