@@ -52,7 +52,7 @@ CLEAN_SED='s/^\(["'\'']?//; s/["'\'']?,\)$//'
 
 # --- 1. ПРИНУДИТЕЛЬНЫЙ СБРОС КЛАВИШ ---
 # Гарантируем, что никакие модификаторы не зажаты перед началом
-ydotool key 29:0 42:0 56:0 125:0 58:0
+ydotool key 29:0 42:0 56:0 58:0 102:0 125:0
 sleep $SLEEP_TIME
 
 # --- 2. БЭКАП ТЕКУЩЕГО БУФЕРА ---
@@ -74,7 +74,24 @@ if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
 elif [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]]; then
     NEW_CLIP=$(gdbus call --session --dest org.kde.klipper --object-path /klipper --method org.kde.klipper.klipper.getClipboardContents | sed -E "$CLEAN_SED")
 fi
+# --- ПРОВЕРКА И ЗАХВАТ ВСЕЙ СТРОКИ---
+# Если текст в буфере не изменился, выделяем до начала строки и вырезаем
+if [[ "$CLIP_BACKUP" == "$NEW_CLIP" ]]; then
+    # Нажимаем Shift + Home (Shift: 42, Home: 102)
+    ydotool key 42:1 102:1 102:0 42:0
+    sleep $SLEEP_TIME
 
+    # Нажимаем Ctrl + X (Ctrl: 29, X: 45)
+    ydotool key 29:1 45:1 45:0 29:0
+    sleep $SLEEP_TIME
+
+    # Обновляем NEW_CLIP после повторной попытки
+    if [[ "$XDG_CURRENT_DESKTOP" == *"GNOME"* ]]; then
+        NEW_CLIP=$(wl-paste)
+    elif [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]]; then
+        NEW_CLIP=$(gdbus call --session --dest org.kde.klipper --object-path /klipper --method org.kde.klipper.klipper.getClipboardContents | sed -E "$CLEAN_SED")
+    fi
+fi
 # --- 4. ОБРАБОТКА И ВСТАВКА ---
 # --- ЗАЩИТА СПЕЦСИМВОЛОВ \t \r \n (как пар символов) ОТ КОНВЕРТАЦИИ ---
 # Заменяем последовательности "\t", "\r", "\n" на временные маркеры,
@@ -241,4 +258,4 @@ ydotool key 29:0 47:0
 ) &
 
 # Финальный сброс всех возможных кнопок
-ydotool key 29:0 42:0 56:0 58:0 125:0
+ydotool key 29:0 42:0 56:0 58:0 102:0 125:0
